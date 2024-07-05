@@ -66,6 +66,6 @@ def handle_document(message):
         bot.reply_to(message, "Please upload a PDF file.")
         
 # Delete webhook (if any) and start polling
-bot.remove_webhook()
+# bot.remove_webhook()
 bot.polling()
 
