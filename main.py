@@ -16,7 +16,7 @@ if not os.path.exists('uploads'):
     os.makedirs('uploads/cv')
     os.makedirs('uploads/coverletter')
 
-@bot.message_handler(commands=['start', 'hello'])
+@bot.message_handler(commands=['start'])
 def send_welcome(message):
     welcome_message = ("Welcome! Please follow the instructions below to submit your documents:\n\n"
                        "/Start - Hello! Please Upload your Cover Letter and CV (PDF format) to apply.\n "
