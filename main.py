@@ -16,11 +16,6 @@ if not ADMIN_CHAT_ID:
 
 bot = telebot.TeleBot(API_KEY)
 
-# Create directories to save the uploaded files
-if not os.path.exists('uploads'):
-    os.makedirs('uploads/cv')
-    os.makedirs('uploads/coverletter')
-
 users = {}
 user_steps = {}
 user_files = {}
@@ -77,43 +72,31 @@ def handle_document(message):
         bot.reply_to(message, "Please provide your full name first by sending it as a message.")
         return
 
-    file_info = bot.get_file(message.document.file_id)
-    file = bot.download_file(file_info.file_path)
-
+    file_id = message.document.file_id
     file_name = message.document.file_name
-    file_extension = os.path.splitext(file_name)[1]
 
-    if file_extension == '.pdf':
-        if message.caption and message.caption.lower() == 'coverletter':
-            if user_steps.get(message.chat.id) == 'awaiting_coverletter':
-                save_path = os.path.join('uploads', 'coverletter', file_name)
-                with open(save_path, 'wb') as f:
-                    f.write(file)
-                user_files[message.chat.id] = {'coverletter': save_path}
-                bot.reply_to(message, "Your cover letter has been saved successfully! Now, please upload your CV (PDF format) with the caption 'cv'.")
-                user_steps[message.chat.id] = 'coverletter_uploaded'
-            else:
-                bot.reply_to(message, "You have already uploaded your cover letter. Please upload your CV with the caption 'cv'.")
-        elif message.caption and message.caption.lower() == 'cv':
-            if user_steps.get(message.chat.id) == 'coverletter_uploaded':
-                save_path = os.path.join('uploads', 'cv', file_name)
-                with open(save_path, 'wb') as f:
-                    f.write(file)
-                user_files[message.chat.id]['cv'] = save_path
-                bot.reply_to(message, "Your CV has been saved successfully! Thank you for completing your application.")
-                user_steps[message.chat.id] = 'cv_uploaded'
-
-                # Notify the admin with both documents
-                full_name = users[message.chat.id]
-                bot.send_message(ADMIN_CHAT_ID, f"New application received:\n\nFull Name: {full_name}")
-                bot.send_document(ADMIN_CHAT_ID, open(user_files[message.chat.id]['coverletter'], 'rb'))
-                bot.send_document(ADMIN_CHAT_ID, open(user_files[message.chat.id]['cv'], 'rb'))
-            else:
-                bot.reply_to(message, "Please upload your cover letter first with the caption 'coverletter'.")
+    if message.caption and message.caption.lower() == 'coverletter':
+        if user_steps.get(message.chat.id) == 'awaiting_coverletter':
+            user_files[message.chat.id] = {'coverletter': file_id}
+            bot.reply_to(message, "Your cover letter has been received successfully! Now, please upload your CV (PDF format) with the caption 'cv'.")
+            user_steps[message.chat.id] = 'coverletter_uploaded'
         else:
-            bot.reply_to(message, "Please specify whether this is a 'coverletter' or 'cv' in the caption.")
+            bot.reply_to(message, "You have already uploaded your cover letter. Please upload your CV with the caption 'cv'.")
+    elif message.caption and message.caption.lower() == 'cv':
+        if user_steps.get(message.chat.id) == 'coverletter_uploaded':
+            user_files[message.chat.id]['cv'] = file_id
+            bot.reply_to(message, "Your CV has been received successfully! Thank you for completing your application.")
+            user_steps[message.chat.id] = 'cv_uploaded'
+
+            # Notify the admin with both documents
+            full_name = users[message.chat.id]
+            bot.send_message(ADMIN_CHAT_ID, f"New application received:\n\nFull Name: {full_name}")
+            bot.send_document(ADMIN_CHAT_ID, user_files[message.chat.id]['coverletter'])
+            bot.send_document(ADMIN_CHAT_ID, user_files[message.chat.id]['cv'])
+        else:
+            bot.reply_to(message, "Please upload your cover letter first with the caption 'coverletter'.")
     else:
-        bot.reply_to(message, "Please upload a PDF file.")
+        bot.reply_to(message, "Please specify whether this is a 'coverletter' or 'cv' in the caption.")
 
 # Delete webhook (if any) and start polling
 # bot.remove_webhook()
