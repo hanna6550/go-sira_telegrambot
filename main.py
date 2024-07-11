@@ -99,5 +99,5 @@ def handle_document(message):
         bot.reply_to(message, "Please specify whether this is a 'coverletter' or 'cv' in the caption.")
 
 # Delete webhook (if any) and start polling
-# bot.remove_webhook()
+bot.remove_webhook()
 bot.polling()
