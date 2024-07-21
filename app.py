@@ -40,10 +40,15 @@ def handle_full_name(message):
         full_name = message.text.strip()
         if re.match(r'^[a-zA-Z]+ [a-zA-Z]+$', full_name):
             users[message.chat.id] = {'full_name': full_name}
-            user_steps[message.chat.id] = 'awaiting_dob'
-            bot.reply_to(message, "Thank you. Please enter your date of birth (YYYY-MM-DD).")
+            user_steps[message.chat.id] = 'awaiting_job_title'
+            bot.reply_to(message, "Thank you. Please enter your job title.")
         else:
             bot.reply_to(message, "Please enter a valid full name (first name and last name).")
+    elif user_steps.get(message.chat.id) == 'awaiting_job_title':
+        job_title = message.text.strip()
+        users[message.chat.id]['job_title'] = job_title
+        user_steps[message.chat.id] = 'awaiting_dob'
+        bot.reply_to(message, "Please enter your date of birth (YYYY-MM-DD).")
     elif user_steps.get(message.chat.id) == 'awaiting_dob':
         dob = message.text.strip()
         if re.match(r'^\d{4}-\d{2}-\d{2}$', dob):
@@ -124,6 +129,7 @@ def handle_document(message):
                 bot.send_message(ADMIN_CHAT_ID, 
                                  f"New application received:\n\n"
                                  f"Full Name: {full_name}\n"
+                                 f"Job Title: {users[message.chat.id]['job_title']}\n"
                                  f"Date of Birth: {users[message.chat.id]['dob']}\n"
                                  f"Gender: {users[message.chat.id]['gender']}\n"
                                  f"Residence Location: {users[message.chat.id]['residence']}\n"
@@ -151,4 +157,3 @@ def handle_document(message):
 # Delete webhook (if any) and start polling
 bot.remove_webhook()
 bot.polling()
-
