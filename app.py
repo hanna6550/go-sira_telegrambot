@@ -32,21 +32,55 @@ def send_welcome(message):
 
 def request_full_name(message):
     bot.reply_to(message, "Hello! Please enter your full name (first name and last name) to start the application process.")
+    user_steps[message.chat.id] = 'awaiting_full_name'
 
 @bot.message_handler(func=lambda message: message.text and message.text.lower() not in ['/start', '/coverletter', '/cv', '/hello'])
 def handle_full_name(message):
-    full_name = message.text.strip()
-    if re.match(r'^[a-zA-Z]+ [a-zA-Z]+$', full_name):
-        users[message.chat.id] = full_name
-        user_steps[message.chat.id] = 'awaiting_coverletter'
-        bot.reply_to(message, f"Thank you, {full_name}. Now, please upload your cover letter (PDF format) with the filename format '{full_name.lower().replace(' ', '_')}_coverletter.pdf'.")
-    else:
-        bot.reply_to(message, "Please enter a valid full name (first name and last name).")
+    if user_steps.get(message.chat.id) == 'awaiting_full_name':
+        full_name = message.text.strip()
+        if re.match(r'^[a-zA-Z]+ [a-zA-Z]+$', full_name):
+            users[message.chat.id] = {'full_name': full_name}
+            user_steps[message.chat.id] = 'awaiting_dob'
+            bot.reply_to(message, "Thank you. Please enter your date of birth (YYYY-MM-DD).")
+        else:
+            bot.reply_to(message, "Please enter a valid full name (first name and last name).")
+    elif user_steps.get(message.chat.id) == 'awaiting_dob':
+        dob = message.text.strip()
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', dob):
+            users[message.chat.id]['dob'] = dob
+            user_steps[message.chat.id] = 'awaiting_gender'
+            bot.reply_to(message, "Please enter your gender (e.g., Male, Female, Other).")
+        else:
+            bot.reply_to(message, "Please enter a valid date of birth in the format YYYY-MM-DD.")
+    elif user_steps.get(message.chat.id) == 'awaiting_gender':
+        gender = message.text.strip()
+        if gender.lower() in ['male', 'female', 'other']:
+            users[message.chat.id]['gender'] = gender
+            user_steps[message.chat.id] = 'awaiting_residence'
+            bot.reply_to(message, "Please enter your residence location.")
+        else:
+            bot.reply_to(message, "Please enter a valid gender (Male, Female, Other).")
+    elif user_steps.get(message.chat.id) == 'awaiting_residence':
+        residence = message.text.strip()
+        if residence:
+            users[message.chat.id]['residence'] = residence
+            user_steps[message.chat.id] = 'awaiting_phone'
+            bot.reply_to(message, "Please enter your phone number.")
+        else:
+            bot.reply_to(message, "Please enter a valid residence location.")
+    elif user_steps.get(message.chat.id) == 'awaiting_phone':
+        phone = message.text.strip()
+        if re.match(r'^\+?\d{10,15}$', phone):
+            users[message.chat.id]['phone'] = phone
+            user_steps[message.chat.id] = 'awaiting_coverletter'
+            bot.reply_to(message, f"Thank you. Now, please upload your cover letter (PDF format) with the filename format '{users[message.chat.id]['full_name'].lower().replace(' ', '_')}_coverletter.pdf'.")
+        else:
+            bot.reply_to(message, "Please enter a valid phone number (10-15 digits).")
 
 @bot.message_handler(commands=['coverletter'])
 def request_coverletter(message):
     if message.chat.id in users:
-        bot.reply_to(message, f"Please upload your cover letter PDF file and add the filename format '{users[message.chat.id].lower().replace(' ', '_')}_coverletter.pdf'.")
+        bot.reply_to(message, f"Please upload your cover letter PDF file and add the filename format '{users[message.chat.id]['full_name'].lower().replace(' ', '_')}_coverletter.pdf'.")
         user_steps[message.chat.id] = 'awaiting_coverletter'
     else:
         bot.reply_to(message, "Please provide your full name first by sending it as a message.")
@@ -55,7 +89,7 @@ def request_coverletter(message):
 def request_cv(message):
     if message.chat.id in users:
         if user_steps.get(message.chat.id) == 'coverletter_uploaded':
-            bot.reply_to(message, f"Please upload your CV PDF file and add the filename format '{users[message.chat.id].lower().replace(' ', '_')}_cv.pdf'.")
+            bot.reply_to(message, f"Please upload your CV PDF file and add the filename format '{users[message.chat.id]['full_name'].lower().replace(' ', '_')}_cv.pdf'.")
             user_steps[message.chat.id] = 'awaiting_cv'
         else:
             bot.reply_to(message, "Please upload your cover letter first.")
@@ -72,7 +106,7 @@ def handle_document(message):
         bot.reply_to(message, "Please provide your full name first by sending it as a message.")
         return
 
-    full_name = users[message.chat.id]
+    full_name = users[message.chat.id]['full_name']
     first_name, last_name = full_name.split()
 
     file_id = message.document.file_id
@@ -86,8 +120,14 @@ def handle_document(message):
                 bot.reply_to(message, "Your CV has been received successfully! Thank you for completing your application.")
                 user_steps[message.chat.id] = 'cv_uploaded'
 
-                # Notify the admin with both documents
-                bot.send_message(ADMIN_CHAT_ID, f"New application received:\n\nFull Name: {full_name}")
+                # Notify the admin with both documents and additional information
+                bot.send_message(ADMIN_CHAT_ID, 
+                                 f"New application received:\n\n"
+                                 f"Full Name: {full_name}\n"
+                                 f"Date of Birth: {users[message.chat.id]['dob']}\n"
+                                 f"Gender: {users[message.chat.id]['gender']}\n"
+                                 f"Residence Location: {users[message.chat.id]['residence']}\n"
+                                 f"Phone Number: {users[message.chat.id]['phone']}")
                 bot.send_document(ADMIN_CHAT_ID, user_files[message.chat.id]['coverletter'])
                 bot.send_document(ADMIN_CHAT_ID, user_files[message.chat.id]['cv'])
             else:
@@ -111,3 +151,4 @@ def handle_document(message):
 # Delete webhook (if any) and start polling
 bot.remove_webhook()
 bot.polling()
+
