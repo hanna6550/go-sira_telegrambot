@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 import telebot
-import re
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,12 +22,10 @@ job_info = {}
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     welcome_message = ("Welcome, Employer! Please follow the instructions below to register and post jobs:\n\n"
-                    #    "/start - to start the bot\n"
                        "/employee_profile_start - Begin the registration process with Employer profile.\n"
                        "/postjob - Post a job.\n"
                        "/myjob - View and manage your job post.\n")
     bot.reply_to(message, welcome_message)
-    request_first_name(message)
 
 def request_first_name(message):
     bot.reply_to(message, "Please enter your first name:")
@@ -39,17 +36,14 @@ def employee_profile_start(message):
     request_first_name(message)
 
 @bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) in [
-    'awaiting_first_name', 'awaiting_father_name', 'awaiting_dob', 'awaiting_company_name', 
-    'awaiting_company_website', 'awaiting_company_email', 'awaiting_job_title', 'awaiting_job_description',
-    'awaiting_job_site', 'awaiting_experience_level', 'awaiting_salary', 'awaiting_working_country', 
-    'awaiting_working_city', 'awaiting_vacancy_number', 'awaiting_applicant_gender', 'awaiting_job_close_date'
+    'awaiting_first_name', 'awaiting_father_name', 'awaiting_dob'
 ])
 def handle_employer_info(message):
     chat_id = message.chat.id
 
     if employer_steps.get(chat_id) == 'awaiting_first_name':
         first_name = message.text.strip()
-        if re.match(r'^[a-zA-Z]+$', first_name):
+        if first_name:
             bot.send_message(chat_id, "Enter your father's name:")
             employer_info[chat_id] = {'first_name': first_name}
             employer_steps[chat_id] = 'awaiting_father_name'
@@ -58,7 +52,7 @@ def handle_employer_info(message):
     
     elif employer_steps.get(chat_id) == 'awaiting_father_name':
         father_name = message.text.strip()
-        if re.match(r'^[a-zA-Z]+$', father_name):
+        if father_name:
             bot.send_message(chat_id, "Enter your date of birth or your age:")
             employer_info[chat_id]['father_name'] = father_name
             employer_steps[chat_id] = 'awaiting_dob'
@@ -67,7 +61,7 @@ def handle_employer_info(message):
     
     elif employer_steps.get(chat_id) == 'awaiting_dob':
         dob = message.text.strip()
-        if re.match(r'^\d{4}-\d{2}-\d{2}$', dob) or dob.isdigit():
+        if dob:
             bot.send_message(chat_id, f"Registration successful! Hello {employer_info[chat_id]['first_name']}, welcome to Go-Sira.\n"
                                       "/postjob - Post a job.\n"
                                       "/myjob - View and manage your job post.\n")
@@ -80,7 +74,7 @@ def handle_employer_info(message):
                              f"Father's Name: {employer_info[chat_id]['father_name']}\n"
                              f"Date of Birth/Age: {employer_info[chat_id]['dob']}")
         else:
-            bot.send_message(chat_id, "Please enter a valid date of birth (YYYY-MM-DD) or age (number).")
+            bot.send_message(chat_id, "Please enter a valid date of birth or age.")
 
 @bot.message_handler(commands=['postjob'])
 def postjob(message):
@@ -88,125 +82,169 @@ def postjob(message):
     bot.send_message(chat_id, 'Please enter the name of your company:')
     employer_steps[chat_id] = 'awaiting_company_name'
 
-@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) in [
-    'awaiting_company_name', 'awaiting_company_website', 'awaiting_company_email', 'awaiting_job_title', 
-    'awaiting_job_description', 'awaiting_job_site', 'awaiting_experience_level', 'awaiting_salary', 
-    'awaiting_working_country', 'awaiting_working_city', 'awaiting_vacancy_number', 'awaiting_applicant_gender', 
-    'awaiting_job_close_date'
-])
-def handle_job_info(message):
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_company_name')
+def handle_company_name(message):
     chat_id = message.chat.id
+    company_name = message.text.strip()
+    if company_name:
+        job_info[chat_id] = {'company_name': company_name}
+        bot.send_message(chat_id, 'Please enter a link to your company\'s website (if any):')
+        employer_steps[chat_id] = 'awaiting_company_website'
+    else:
+        bot.send_message(chat_id, 'Please enter a valid company name.')
 
-    if employer_steps.get(chat_id) == 'awaiting_company_name':
-        company_name = message.text.strip()
-        bot.send_message(chat_id, 'Received company name: ' + company_name)  # Debugging message
-        if company_name:
-            bot.send_message(chat_id, 'Please enter a link to your company\'s website (if any):')
-            employer_steps[chat_id] = 'awaiting_company_website'
-            job_info[chat_id] = {'company_name': company_name}
-        else:
-            bot.send_message(chat_id, 'Please enter a valid company name.')
-    
-    elif employer_steps.get(chat_id) == 'awaiting_company_website':
-        company_website = message.text.strip()
-        bot.send_message(chat_id, 'Received company website: ' + company_website)  # Debugging message
-        bot.send_message(chat_id, 'Please enter the email address of your company (if any):')
-        employer_steps[chat_id] = 'awaiting_company_email'
-        job_info[chat_id]['company_website'] = company_website
-    
-    elif employer_steps.get(chat_id) == 'awaiting_company_email':
-        company_email = message.text.strip()
-        bot.send_message(chat_id, 'Received company email: ' + company_email)  # Debugging message
-        bot.send_message(chat_id, 'Successfully registered your company. Now, enter the job title:')
-        employer_steps[chat_id] = 'awaiting_job_title'
-        job_info[chat_id]['company_email'] = company_email
-    
-    elif employer_steps.get(chat_id) == 'awaiting_job_title':
-        job_title = message.text.strip()
-        bot.send_message(chat_id, 'Received job title: ' + job_title)  # Debugging message
-        bot.send_message(chat_id, 'Please enter the job description (minimum 50 characters):')
-        employer_steps[chat_id] = 'awaiting_job_description'
-        job_info[chat_id]['job_title'] = job_title
-    
-    elif employer_steps.get(chat_id) == 'awaiting_job_description':
-        job_description = message.text.strip()
-        bot.send_message(chat_id, 'Received job description: ' + job_description)  # Debugging message
-        if len(job_description) >= 50:
-            bot.send_message(chat_id, 'Please enter the job site:')
-            employer_steps[chat_id] = 'awaiting_job_site'
-            job_info[chat_id]['job_description'] = job_description
-        else:
-            bot.send_message(chat_id, 'Job description must be at least 50 characters long.')
-    
-    elif employer_steps.get(chat_id) == 'awaiting_job_site':
-        job_site = message.text.strip()
-        bot.send_message(chat_id, 'Received job site: ' + job_site)  # Debugging message
-        bot.send_message(chat_id, 'Please enter the experience level:')
-        employer_steps[chat_id] = 'awaiting_experience_level'
-        job_info[chat_id]['job_site'] = job_site
-    
-    elif employer_steps.get(chat_id) == 'awaiting_experience_level':
-        experience_level = message.text.strip()
-        bot.send_message(chat_id, 'Received experience level: ' + experience_level)  # Debugging message
-        bot.send_message(chat_id, 'Please enter the salary/compensation (you can skip by typing "skip"):')
-        employer_steps[chat_id] = 'awaiting_salary'
-        job_info[chat_id]['experience_level'] = experience_level
-    
-    elif employer_steps.get(chat_id) == 'awaiting_salary':
-        salary = message.text.strip()
-        bot.send_message(chat_id, 'Received salary: ' + salary)  # Debugging message
-        bot.send_message(chat_id, 'Please enter the working country:')
-        employer_steps[chat_id] = 'awaiting_working_country'
-        job_info[chat_id]['salary'] = salary
-    
-    elif employer_steps.get(chat_id) == 'awaiting_working_country':
-        working_country = message.text.strip()
-        bot.send_message(chat_id, 'Received working country: ' + working_country)  # Debugging message
-        bot.send_message(chat_id, 'Please enter the working city:')
-        employer_steps[chat_id] = 'awaiting_working_city'
-        job_info[chat_id]['working_country'] = working_country
-    
-    elif employer_steps.get(chat_id) == 'awaiting_working_city':
-        working_city = message.text.strip()
-        bot.send_message(chat_id, 'Received working city: ' + working_city)  # Debugging message
-        bot.send_message(chat_id, 'Please enter the vacancy number:')
-        employer_steps[chat_id] = 'awaiting_vacancy_number'
-        job_info[chat_id]['working_city'] = working_city
-    
-    elif employer_steps.get(chat_id) == 'awaiting_vacancy_number':
-        vacancy_number = message.text.strip()
-        bot.send_message(chat_id, 'Received vacancy number: ' + vacancy_number)  # Debugging message
-        bot.send_message(chat_id, 'Please enter the preferred gender of the applicant:')
-        employer_steps[chat_id] = 'awaiting_applicant_gender'
-        job_info[chat_id]['vacancy_number'] = vacancy_number
-    
-    elif employer_steps.get(chat_id) == 'awaiting_applicant_gender':
-        applicant_gender = message.text.strip()
-        bot.send_message(chat_id, 'Received applicant gender: ' + applicant_gender)  # Debugging message
-        bot.send_message(chat_id, 'Please enter the job/application close date (YYYY-MM-DD):')
-        employer_steps[chat_id] = 'awaiting_job_close_date'
-        job_info[chat_id]['applicant_gender'] = applicant_gender
-    
-    elif employer_steps.get(chat_id) == 'awaiting_job_close_date':
-        job_close_date = message.text.strip()
-        bot.send_message(chat_id, 'Received job close date: ' + job_close_date)  # Debugging message
-        job_info[chat_id]['job_close_date'] = job_close_date
-        bot.send_message(chat_id, 'You have successfully submitted your job post. Please wait patiently until our approval.')
-        employer_steps[chat_id] = None
-        # Notify admin
-        bot.send_message(ADMIN_CHAT_ID, 
-                         f"New job post submitted for approval:\n\n"
-                         f"Company Name: {job_info[chat_id]['company_name']}\n"
-                         f"Job Title: {job_info[chat_id]['job_title']}\n"
-                         f"Job Description: {job_info[chat_id]['job_description']}\n"
-                         f"Job Site: {job_info[chat_id]['job_site']}\n"
-                         f"Experience Level: {job_info[chat_id]['experience_level']}\n"
-                         f"Salary: {job_info[chat_id]['salary']}\n"
-                         f"Working Country: {job_info[chat_id]['working_country']}\n"
-                         f"Working City: {job_info[chat_id]['working_city']}\n"
-                         f"Vacancy Number: {job_info[chat_id]['vacancy_number']}\n"
-                         f"Applicant Gender: {job_info[chat_id]['applicant_gender']}\n"
-                         f"Job/Application Close Date: {job_info[chat_id]['job_close_date']}")
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_company_website')
+def handle_company_website(message):
+    chat_id = message.chat.id
+    company_website = message.text.strip()
+    job_info[chat_id]['company_website'] = company_website
+    bot.send_message(chat_id, 'Please enter the email address of your company (if any):')
+    employer_steps[chat_id] = 'awaiting_company_email'
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_company_email')
+def handle_company_email(message):
+    chat_id = message.chat.id
+    company_email = message.text.strip()
+    job_info[chat_id]['company_email'] = company_email
+    bot.send_message(chat_id, 'Successfully registered your company. Now, enter the job title:')
+    employer_steps[chat_id] = 'awaiting_job_title'
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_job_title')
+def handle_job_title(message):
+    chat_id = message.chat.id
+    job_title = message.text.strip()
+    job_info[chat_id]['job_title'] = job_title
+    bot.send_message(chat_id, 'Please enter the job description (minimum 50 characters):')
+    employer_steps[chat_id] = 'awaiting_job_description'
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_job_description')
+def handle_job_description(message):
+    chat_id = message.chat.id
+    job_description = message.text.strip()
+    if len(job_description) >= 50:
+        job_info[chat_id]['job_description'] = job_description
+        bot.send_message(chat_id, 'Please enter the job site:')
+        employer_steps[chat_id] = 'awaiting_job_site'
+    else:
+        bot.send_message(chat_id, 'Job description must be at least 50 characters long.')
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_job_site')
+def handle_job_site(message):
+    chat_id = message.chat.id
+    job_site = message.text.strip()
+    job_info[chat_id]['job_site'] = job_site
+    bot.send_message(chat_id, 'Please enter the experience level:')
+    employer_steps[chat_id] = 'awaiting_experience_level'
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_experience_level')
+def handle_experience_level(message):
+    chat_id = message.chat.id
+    experience_level = message.text.strip()
+    job_info[chat_id]['experience_level'] = experience_level
+    bot.send_message(chat_id, 'Please enter the salary/compensation (you can skip by typing "skip"):')
+    employer_steps[chat_id] = 'awaiting_salary'
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_salary')
+def handle_salary(message):
+    chat_id = message.chat.id
+    salary = message.text.strip()
+    job_info[chat_id]['salary'] = salary
+    bot.send_message(chat_id, 'Please enter the working country:')
+    employer_steps[chat_id] = 'awaiting_working_country'
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_working_country')
+def handle_working_country(message):
+    chat_id = message.chat.id
+    working_country = message.text.strip()
+    job_info[chat_id]['working_country'] = working_country
+    bot.send_message(chat_id, 'Please enter the working city:')
+    employer_steps[chat_id] = 'awaiting_working_city'
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_working_city')
+def handle_working_city(message):
+    chat_id = message.chat.id
+    working_city = message.text.strip()
+    job_info[chat_id]['working_city'] = working_city
+    bot.send_message(chat_id, 'Please enter the vacancy number:')
+    employer_steps[chat_id] = 'awaiting_vacancy_number'
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_vacancy_number')
+def handle_vacancy_number(message):
+    chat_id = message.chat.id
+    vacancy_number = message.text.strip()
+    job_info[chat_id]['vacancy_number'] = vacancy_number
+    bot.send_message(chat_id, 'Please enter the preferred gender of the applicant:')
+    employer_steps[chat_id] = 'awaiting_applicant_gender'
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_applicant_gender')
+def handle_applicant_gender(message):
+    chat_id = message.chat.id
+    applicant_gender = message.text.strip()
+    job_info[chat_id]['applicant_gender'] = applicant_gender
+    bot.send_message(chat_id, 'Please enter the job/application close date (YYYY-MM-DD):')
+    employer_steps[chat_id] = 'awaiting_job_close_date'
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_job_close_date')
+def handle_job_close_date(message):
+    chat_id = message.chat.id
+    job_close_date = message.text.strip()
+    job_info[chat_id]['job_close_date'] = job_close_date
+    bot.send_message(chat_id, 'You have successfully submitted your job post. Please wait patiently until our approval.')
+    employer_steps[chat_id] = None
+    # Notify admin
+    bot.send_message(ADMIN_CHAT_ID, 
+                     f"New job post submitted for approval:\n\n"
+                     f"Company Name: {job_info[chat_id]['company_name']}\n"
+                     f"Job Title: {job_info[chat_id]['job_title']}\n"
+                     f"Job Description: {job_info[chat_id]['job_description']}\n"
+                     f"Job Site: {job_info[chat_id]['job_site']}\n"
+                     f"Experience Level: {job_info[chat_id]['experience_level']}\n"
+                     f"Salary: {job_info[chat_id]['salary']}\n"
+                     f"Working Country: {job_info[chat_id]['working_country']}\n"
+                     f"Working City: {job_info[chat_id]['working_city']}\n"
+                     f"Vacancy Number: {job_info[chat_id]['vacancy_number']}\n"
+                     f"Applicant Gender: {job_info[chat_id]['applicant_gender']}\n"
+                     f"Job/Application Close Date: {job_info[chat_id]['job_close_date']}\n"
+                     f"Chat ID: {chat_id}")
+
+@bot.message_handler(commands=['myjob'])
+def myjob(message):
+    chat_id = message.chat.id
+    if chat_id in job_info:
+        job_details = job_info[chat_id]
+        job_message = (f"Your Job Post:\n\n"
+                       f"Company Name: {job_details.get('company_name')}\n"
+                       f"Job Title: {job_details.get('job_title')}\n"
+                       f"Job Description: {job_details.get('job_description')}\n"
+                       f"Job Site: {job_details.get('job_site')}\n"
+                       f"Experience Level: {job_details.get('experience_level')}\n"
+                       f"Salary: {job_details.get('salary')}\n"
+                       f"Working Country: {job_details.get('working_country')}\n"
+                       f"Working City: {job_details.get('working_city')}\n"
+                       f"Vacancy Number: {job_details.get('vacancy_number')}\n"
+                       f"Applicant Gender: {job_details.get('applicant_gender')}\n"
+                       f"Job/Application Close Date: {job_details.get('job_close_date')}")
+        bot.send_message(chat_id, job_message)
+    else:
+        bot.send_message(chat_id, 'You have not posted any jobs yet.')
+
+@bot.message_handler(commands=['approve', 'reject'])
+def handle_admin_action(message):
+    chat_id = message.chat.id
+    if chat_id == ADMIN_CHAT_ID:
+        try:
+            command, target_chat_id, *rest = message.text.split()
+            target_chat_id = int(target_chat_id)
+            if command == '/approve':
+                bot.send_message(target_chat_id, 'Your job post has been approved and is now live.')
+                # Further action for approval (e.g., adding to database)
+            elif command == '/reject':
+                bot.send_message(target_chat_id, 'Your job post has been rejected and will not be posted.')
+                # Further action for rejection (e.g., removing from pending list)
+        except Exception as e:
+            bot.send_message(chat_id, f"Error processing command: {str(e)}")
+    else:
+        bot.send_message(chat_id, 'You are not authorized to use this command.')
 
 bot.remove_webhook()
 bot.polling()
