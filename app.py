@@ -59,7 +59,7 @@ def handle_full_name(message):
             bot.reply_to(message, "Please enter a valid date of birth in the format YYYY-MM-DD.")
     elif user_steps.get(message.chat.id) == 'awaiting_gender':
         gender = message.text.strip()
-        if gender.lower() in ['male', 'female', 'other']:
+        if gender.lower() in ['male', 'female']:
             users[message.chat.id]['gender'] = gender
             user_steps[message.chat.id] = 'awaiting_residence'
             bot.reply_to(message, "Please enter your residence location.")
