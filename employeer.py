@@ -18,6 +18,7 @@ bot = telebot.TeleBot(EMPLOYER_API_KEY)
 employer_steps = {}
 employer_info = {}
 job_info = {}
+pending_job_posts = {}
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -189,58 +190,60 @@ def handle_job_close_date(message):
     chat_id = message.chat.id
     job_close_date = message.text.strip()
     job_info[chat_id]['job_close_date'] = job_close_date
-    bot.send_message(chat_id, 'You have successfully submitted your job post. Please wait patiently until our approval.')
+    pending_job_posts[chat_id] = job_info[chat_id]  # Add job post to pending list
+    bot.send_message(chat_id, 'You have successfully submitted your job post. Please wait patiently for approval.')
     employer_steps[chat_id] = None
+
     # Notify admin
     bot.send_message(ADMIN_CHAT_ID, 
-                     f"New job post submitted for approval:\n\n"
-                     f"Company Name: {job_info[chat_id]['company_name']}\n"
-                     f"Job Title: {job_info[chat_id]['job_title']}\n"
-                     f"Job Description: {job_info[chat_id]['job_description']}\n"
-                     f"Job Site: {job_info[chat_id]['job_site']}\n"
-                     f"Experience Level: {job_info[chat_id]['experience_level']}\n"
-                     f"Salary: {job_info[chat_id]['salary']}\n"
-                     f"Working Country: {job_info[chat_id]['working_country']}\n"
-                     f"Working City: {job_info[chat_id]['working_city']}\n"
-                     f"Vacancy Number: {job_info[chat_id]['vacancy_number']}\n"
-                     f"Applicant Gender: {job_info[chat_id]['applicant_gender']}\n"
-                     f"Job/Application Close Date: {job_info[chat_id]['job_close_date']}\n"
-                     f"Chat ID: {chat_id}")
+                     f"New job post submitted for approval:\n\n\n"
+                     f"Company Name: {job_info[chat_id]['company_name']}\n\n"
+                     f"Job Title: {job_info[chat_id]['job_title']}\n\n"
+                     f"Vacancy Number: {job_info[chat_id]['vacancy_number']}\n\n"
+                     f"Applicant Gender: {job_info[chat_id]['applicant_gender']}\n\n"
+                     f"Job Description: {job_info[chat_id]['job_description']}\n\n"
+                     f"Job Site: {job_info[chat_id]['job_site']}\n\n"
+                     f"Experience Level: {job_info[chat_id]['experience_level']}\n\n"
+                     f"Salary: {job_info[chat_id]['salary']}\n\n"
+                     f"Working Country and City: {job_info[chat_id]['working_country', 'working_city']}\n\n"
+                    #  f"Working City: {job_info[chat_id]['working_city']}\n"
+                     f"Job/Application Close Date: {job_info[chat_id]['job_close_date']}\n\n"
+                     f"Chat ID: {chat_id}\n"
+                     f"/approve_{chat_id} - Approve this job post\n"
+                     f"/reject_{chat_id} - Reject this job post")
 
-@bot.message_handler(commands=['myjob'])
-def myjob(message):
+@bot.message_handler(func=lambda message: message.text.startswith('/approve_'))
+def handle_approve(message):
     chat_id = message.chat.id
-    if chat_id in job_info:
-        job_details = job_info[chat_id]
-        job_message = (f"Your Job Post:\n\n"
-                       f"Company Name: {job_details.get('company_name')}\n"
-                       f"Job Title: {job_details.get('job_title')}\n"
-                       f"Job Description: {job_details.get('job_description')}\n"
-                       f"Job Site: {job_details.get('job_site')}\n"
-                       f"Experience Level: {job_details.get('experience_level')}\n"
-                       f"Salary: {job_details.get('salary')}\n"
-                       f"Working Country: {job_details.get('working_country')}\n"
-                       f"Working City: {job_details.get('working_city')}\n"
-                       f"Vacancy Number: {job_details.get('vacancy_number')}\n"
-                       f"Applicant Gender: {job_details.get('applicant_gender')}\n"
-                       f"Job/Application Close Date: {job_details.get('job_close_date')}")
-        bot.send_message(chat_id, job_message)
-    else:
-        bot.send_message(chat_id, 'You have not posted any jobs yet.')
-
-@bot.message_handler(commands=['approve', 'reject'])
-def handle_admin_action(message):
-    chat_id = message.chat.id
-    if chat_id == ADMIN_CHAT_ID:
+    if str(chat_id) == ADMIN_CHAT_ID:
         try:
-            command, target_chat_id, *rest = message.text.split()
-            target_chat_id = int(target_chat_id)
-            if command == '/approve':
-                bot.send_message(target_chat_id, 'Your job post has been approved and is now live.')
+            target_chat_id = int(message.text.split('_')[1])
+            if target_chat_id in pending_job_posts:
+                job_title = pending_job_posts[target_chat_id]['job_title']
+                bot.send_message(target_chat_id, f'Your job "{job_title}" has been approved for posting.')
                 # Further action for approval (e.g., adding to database)
-            elif command == '/reject':
-                bot.send_message(target_chat_id, 'Your job post has been rejected and will not be posted.')
+                del pending_job_posts[target_chat_id]
+                bot.send_message(chat_id, f"Job post for chat ID {target_chat_id} has been approved.")
+            else:
+                bot.send_message(chat_id, "Invalid chat ID or job post not found.")
+        except Exception as e:
+            bot.send_message(chat_id, f"Error processing command: {str(e)}")
+    else:
+        bot.send_message(chat_id, 'You are not authorized to use this command.')
+
+@bot.message_handler(func=lambda message: message.text.startswith('/reject_'))
+def handle_reject(message):
+    chat_id = message.chat.id
+    if str(chat_id) == ADMIN_CHAT_ID:
+        try:
+            target_chat_id = int(message.text.split('_')[1])
+            if target_chat_id in pending_job_posts:
+                bot.send_message(target_chat_id, 'Your job post was not approved. Please review and correct the information.')
                 # Further action for rejection (e.g., removing from pending list)
+                del pending_job_posts[target_chat_id]
+                bot.send_message(chat_id, f"Job post for chat ID {target_chat_id} has been rejected.")
+            else:
+                bot.send_message(chat_id, "Invalid chat ID or job post not found.")
         except Exception as e:
             bot.send_message(chat_id, f"Error processing command: {str(e)}")
     else:
