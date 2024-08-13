@@ -192,82 +192,98 @@ def handle_job_close_date(message):
     chat_id = message.chat.id
     job_close_date = message.text.strip()
     job_info[chat_id]['job_close_date'] = job_close_date
+    bot.send_message(chat_id, 'Job post received. The admin will review it shortly.')
+    employer_steps[chat_id] = None
 
-    # Notify admin for approval
-    bot.send_message(chat_id, 'Your job post has been submitted for approval.')
     pending_job_posts[chat_id] = job_info[chat_id]
+    notify_admin_for_approval(chat_id)
 
-    # Send to admin for approval
+def notify_admin_for_approval(chat_id):
+    job_details = pending_job_posts[chat_id]
+    job_summary = (f"New job post submission:\n\n"
+                   f"Company Name: {job_details['company_name']}\n"
+                   f"Job Title: {job_details['job_title']}\n"
+                   f"Description: {job_details['job_description']}\n"
+                   f"Site: {job_details['job_site']}\n"
+                   f"Experience Level: {job_details['experience_level']}\n"
+                   f"Salary: {job_details['salary']}\n"
+                   f"Working Country: {job_details['working_country']}\n"
+                   f"Working City: {job_details['working_city']}\n"
+                   f"Vacancy Number: {job_details['vacancy_number']}\n"
+                   f"Applicant Gender: {job_details['applicant_gender']}\n"
+                   f"Close Date: {job_details['job_close_date']}\n\n"
+                   f"Chat ID: {chat_id}\n"
+                   "Approve or Reject?")
+    
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("Approve", callback_data=f"approve_{chat_id}"))
-    markup.add(InlineKeyboardButton("Reject", callback_data=f"reject_{chat_id}"))
-    bot.send_message(ADMIN_CHAT_ID, f"New job post for approval:\n\n"
-                                    f"Company Name: {job_info[chat_id]['company_name']}\n"
-                                    f"Job Title: {job_info[chat_id]['job_title']}\n"
-                                    f"Job Description: {job_info[chat_id]['job_description']}\n"
-                                    f"Job Site: {job_info[chat_id]['job_site']}\n"
-                                    f"Experience Level: {job_info[chat_id]['experience_level']}\n"
-                                    f"Salary: {job_info[chat_id]['salary']}\n"
-                                    f"Working Country: {job_info[chat_id]['working_country']}\n"
-                                    f"Working City: {job_info[chat_id]['working_city']}\n"
-                                    f"Vacancy Number: {job_info[chat_id]['vacancy_number']}\n"
-                                    f"Applicant Gender: {job_info[chat_id]['applicant_gender']}\n"
-                                    f"Close Date: {job_info[chat_id]['job_close_date']}\n", reply_markup=markup)
+    approve_button = InlineKeyboardButton('Approve', callback_data=f'approve_{chat_id}')
+    reject_button = InlineKeyboardButton('Reject', callback_data=f'reject_{chat_id}')
+    markup.add(approve_button, reject_button)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("approve_"))
-def approve_job_post(call):
-    chat_id = int(call.data.split("_")[1])
-    if chat_id in pending_job_posts:
-        job_post = pending_job_posts[chat_id]
-        del pending_job_posts[chat_id]
-        
-        # Post to the channel
-        job_post_text = (f"**{job_post['job_title']}** at *{job_post['company_name']}*\n\n"
-                         f"**Description**: {job_post['job_description']}\n"
-                         f"**Location**: {job_post['job_site']}, {job_post['working_city']}, {job_post['working_country']}\n"
-                         f"**Experience Level**: {job_post['experience_level']}\n"
-                         f"**Salary**: {job_post['salary']}\n"
-                         f"**Vacancy Number**: {job_post['vacancy_number']}\n"
-                         f"**Gender Preference**: {job_post['applicant_gender']}\n"
-                         f"**Closing Date**: {job_post['job_close_date']}\n")
+    bot.send_message(ADMIN_CHAT_ID, job_summary, reply_markup=markup)
 
-        markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("Apply on Bot", url="https://t.me/bot1sirabot"))
-        bot.send_message(CHANNEL_ID, job_post_text, reply_markup=markup)
+@bot.callback_query_handler(func=lambda call: call.data.startswith('approve_'))
+def approve_job(call):
+    chat_id = int(call.data.split('_')[1])
+    job_details = pending_job_posts.pop(chat_id, None)
 
-        # Notify employer
-        bot.send_message(chat_id, "Your job post has been approved and posted successfully.")
-        bot.answer_callback_query(call.id, "Job post approved and posted successfully.")
+    if job_details:
+        post_to_channel(job_details)
+        bot.send_message(chat_id, 'Your job post has been approved and posted to the channel.')
+        bot.send_message(ADMIN_CHAT_ID, f"Job post for chat ID {chat_id} has been approved.")
     else:
-        bot.answer_callback_query(call.id, "Job post not found or already processed.")
+        bot.send_message(call.message.chat.id, "No pending job found to approve.")
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("reject_"))
-def reject_job_post(call):
-    chat_id = int(call.data.split("_")[1])
-    if chat_id in pending_job_posts:
-        del pending_job_posts[chat_id]
-        
-        # Notify employer
-        bot.send_message(chat_id, "Your job post has been rejected.")
-        bot.answer_callback_query(call.id, "Job post rejected.")
+@bot.callback_query_handler(func=lambda call: call.data.startswith('reject_'))
+def reject_job(call):
+    chat_id = int(call.data.split('_')[1])
+    job_details = pending_job_posts.pop(chat_id, None)
+
+    if job_details:
+        bot.send_message(chat_id, 'Your job post has been rejected by the admin.')
+        bot.send_message(ADMIN_CHAT_ID, f"Job post for chat ID {chat_id} has been rejected.")
     else:
-        bot.answer_callback_query(call.id, "Job post not found or already processed.")
+        bot.send_message(call.message.chat.id, "No pending job found to reject.")
+
+def post_to_channel(job_details):
+    channel_post = (f"🚨 New Job Posting 🚨\n\n"
+                    f"Company: {job_details['company_name']}\n"
+                    f"Job Title: {job_details['job_title']}\n"
+                    f"Job Description: {job_details['job_description']}\n"
+                    f"Location: {job_details['working_country']}, {job_details['working_city']}\n"
+                    f"Vacancy Number: {job_details['vacancy_number']}\n"
+                    f"Experience Level: {job_details['experience_level']}\n"
+                    f"Preferred Gender: {job_details['applicant_gender']}\n"
+                    f"Salary: {job_details['salary']}\n"
+                    f"Application Deadline: {job_details['job_close_date']}\n\n"
+                    # f"Apply on Bot: @bot1sirabot"
+                    )
+
+    markup = InlineKeyboardMarkup()
+    apply_button = InlineKeyboardButton("Apply on Bot", url="https://t.me/bot1sirabot")
+    markup.add(apply_button)
+
+    bot.send_message(CHANNEL_ID, channel_post, reply_markup=markup)
 
 @bot.message_handler(commands=['myjob'])
-def view_my_job_posts(message):
+def myjob(message):
     chat_id = message.chat.id
     if chat_id in job_info:
-        job_post = job_info[chat_id]
-        job_post_text = (f"**{job_post['job_title']}** at *{job_post['company_name']}*\n\n"
-                         f"**Description**: {job_post['job_description']}\n"
-                         f"**Location**: {job_post['job_site']}, {job_post['working_city']}, {job_post['working_country']}\n"
-                         f"**Experience Level**: {job_post['experience_level']}\n"
-                         f"**Salary**: {job_post['salary']}\n"
-                         f"**Vacancy Number**: {job_post['vacancy_number']}\n"
-                         f"**Gender Preference**: {job_post['applicant_gender']}\n"
-                         f"**Closing Date**: {job_post['job_close_date']}\n")
-        bot.send_message(chat_id, job_post_text)
+        job_details = job_info[chat_id]
+        job_summary = (f"Your current job post:\n\n"
+                       f"Company Name: {job_details['company_name']}\n"
+                       f"Job Title: {job_details['job_title']}\n"
+                       f"Description: {job_details['job_description']}\n"
+                       f"Site: {job_details['job_site']}\n"
+                       f"Experience Level: {job_details['experience_level']}\n"
+                       f"Salary: {job_details['salary']}\n"
+                       f"Working Country: {job_details['working_country']}\n"
+                       f"Working City: {job_details['working_city']}\n"
+                       f"Vacancy Number: {job_details['vacancy_number']}\n"
+                       f"Applicant Gender: {job_details['applicant_gender']}\n"
+                       f"Close Date: {job_details['job_close_date']}")
+        bot.send_message(chat_id, job_summary)
     else:
-        bot.send_message(chat_id, "You have no job posts.")
+        bot.send_message(chat_id, 'You have no active job posts.')
 
-bot.polling()
+bot.infinity_polling()
