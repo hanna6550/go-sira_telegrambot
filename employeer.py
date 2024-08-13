@@ -1,12 +1,14 @@
 import os
 from dotenv import load_dotenv
 import telebot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Load environment variables from .env file
 load_dotenv()
 
 EMPLOYER_API_KEY = os.getenv('EMPLOYER_API_KEY')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
+CHANNEL_ID = '@go_sira'  # Replace with the actual channel ID
 
 if not EMPLOYER_API_KEY:
     raise ValueError("No API key provided. Please set the EMPLOYER_API_KEY environment variable in the .env file.")
@@ -190,64 +192,82 @@ def handle_job_close_date(message):
     chat_id = message.chat.id
     job_close_date = message.text.strip()
     job_info[chat_id]['job_close_date'] = job_close_date
-    pending_job_posts[chat_id] = job_info[chat_id]  # Add job post to pending list
-    bot.send_message(chat_id, 'You have successfully submitted your job post. Please wait patiently for approval.')
-    employer_steps[chat_id] = None
 
-    # Notify admin
-    bot.send_message(ADMIN_CHAT_ID, 
-                     f"New job post submitted for approval:\n\n\n"
-                     f"Company Name: {job_info[chat_id]['company_name']}\n\n"
-                     f"Job Title: {job_info[chat_id]['job_title']}\n\n"
-                     f"Vacancy Number: {job_info[chat_id]['vacancy_number']}\n\n"
-                     f"Applicant Gender: {job_info[chat_id]['applicant_gender']}\n\n"
-                     f"Job Description: {job_info[chat_id]['job_description']}\n\n"
-                     f"Job Site: {job_info[chat_id]['job_site']}\n\n"
-                     f"Experience Level: {job_info[chat_id]['experience_level']}\n\n"
-                     f"Salary: {job_info[chat_id]['salary']}\n\n"
-                     f"Working Country and City: {job_info[chat_id]['working_country', 'working_city']}\n\n"
-                    #  f"Working City: {job_info[chat_id]['working_city']}\n"
-                     f"Job/Application Close Date: {job_info[chat_id]['job_close_date']}\n\n"
-                     f"Chat ID: {chat_id}\n"
-                     f"/approve_{chat_id} - Approve this job post\n"
-                     f"/reject_{chat_id} - Reject this job post")
+    # Notify admin for approval
+    bot.send_message(chat_id, 'Your job post has been submitted for approval.')
+    pending_job_posts[chat_id] = job_info[chat_id]
 
-@bot.message_handler(func=lambda message: message.text.startswith('/approve_'))
-def handle_approve(message):
-    chat_id = message.chat.id
-    if str(chat_id) == ADMIN_CHAT_ID:
-        try:
-            target_chat_id = int(message.text.split('_')[1])
-            if target_chat_id in pending_job_posts:
-                job_title = pending_job_posts[target_chat_id]['job_title']
-                bot.send_message(target_chat_id, f'Your job "{job_title}" has been approved for posting.')
-                # Further action for approval (e.g., adding to database)
-                del pending_job_posts[target_chat_id]
-                bot.send_message(chat_id, f"Job post for chat ID {target_chat_id} has been approved.")
-            else:
-                bot.send_message(chat_id, "Invalid chat ID or job post not found.")
-        except Exception as e:
-            bot.send_message(chat_id, f"Error processing command: {str(e)}")
+    # Send to admin for approval
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("Approve", callback_data=f"approve_{chat_id}"))
+    markup.add(InlineKeyboardButton("Reject", callback_data=f"reject_{chat_id}"))
+    bot.send_message(ADMIN_CHAT_ID, f"New job post for approval:\n\n"
+                                    f"Company Name: {job_info[chat_id]['company_name']}\n"
+                                    f"Job Title: {job_info[chat_id]['job_title']}\n"
+                                    f"Job Description: {job_info[chat_id]['job_description']}\n"
+                                    f"Job Site: {job_info[chat_id]['job_site']}\n"
+                                    f"Experience Level: {job_info[chat_id]['experience_level']}\n"
+                                    f"Salary: {job_info[chat_id]['salary']}\n"
+                                    f"Working Country: {job_info[chat_id]['working_country']}\n"
+                                    f"Working City: {job_info[chat_id]['working_city']}\n"
+                                    f"Vacancy Number: {job_info[chat_id]['vacancy_number']}\n"
+                                    f"Applicant Gender: {job_info[chat_id]['applicant_gender']}\n"
+                                    f"Close Date: {job_info[chat_id]['job_close_date']}\n", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("approve_"))
+def approve_job_post(call):
+    chat_id = int(call.data.split("_")[1])
+    if chat_id in pending_job_posts:
+        job_post = pending_job_posts[chat_id]
+        del pending_job_posts[chat_id]
+        
+        # Post to the channel
+        job_post_text = (f"**{job_post['job_title']}** at *{job_post['company_name']}*\n\n"
+                         f"**Description**: {job_post['job_description']}\n"
+                         f"**Location**: {job_post['job_site']}, {job_post['working_city']}, {job_post['working_country']}\n"
+                         f"**Experience Level**: {job_post['experience_level']}\n"
+                         f"**Salary**: {job_post['salary']}\n"
+                         f"**Vacancy Number**: {job_post['vacancy_number']}\n"
+                         f"**Gender Preference**: {job_post['applicant_gender']}\n"
+                         f"**Closing Date**: {job_post['job_close_date']}\n")
+
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("Apply on Bot", url="https://t.me/bot1sirabot"))
+        bot.send_message(CHANNEL_ID, job_post_text, reply_markup=markup)
+
+        # Notify employer
+        bot.send_message(chat_id, "Your job post has been approved and posted successfully.")
+        bot.answer_callback_query(call.id, "Job post approved and posted successfully.")
     else:
-        bot.send_message(chat_id, 'You are not authorized to use this command.')
+        bot.answer_callback_query(call.id, "Job post not found or already processed.")
 
-@bot.message_handler(func=lambda message: message.text.startswith('/reject_'))
-def handle_reject(message):
-    chat_id = message.chat.id
-    if str(chat_id) == ADMIN_CHAT_ID:
-        try:
-            target_chat_id = int(message.text.split('_')[1])
-            if target_chat_id in pending_job_posts:
-                bot.send_message(target_chat_id, 'Your job post was not approved. Please review and correct the information.')
-                # Further action for rejection (e.g., removing from pending list)
-                del pending_job_posts[target_chat_id]
-                bot.send_message(chat_id, f"Job post for chat ID {target_chat_id} has been rejected.")
-            else:
-                bot.send_message(chat_id, "Invalid chat ID or job post not found.")
-        except Exception as e:
-            bot.send_message(chat_id, f"Error processing command: {str(e)}")
+@bot.callback_query_handler(func=lambda call: call.data.startswith("reject_"))
+def reject_job_post(call):
+    chat_id = int(call.data.split("_")[1])
+    if chat_id in pending_job_posts:
+        del pending_job_posts[chat_id]
+        
+        # Notify employer
+        bot.send_message(chat_id, "Your job post has been rejected.")
+        bot.answer_callback_query(call.id, "Job post rejected.")
     else:
-        bot.send_message(chat_id, 'You are not authorized to use this command.')
+        bot.answer_callback_query(call.id, "Job post not found or already processed.")
 
-bot.remove_webhook()
+@bot.message_handler(commands=['myjob'])
+def view_my_job_posts(message):
+    chat_id = message.chat.id
+    if chat_id in job_info:
+        job_post = job_info[chat_id]
+        job_post_text = (f"**{job_post['job_title']}** at *{job_post['company_name']}*\n\n"
+                         f"**Description**: {job_post['job_description']}\n"
+                         f"**Location**: {job_post['job_site']}, {job_post['working_city']}, {job_post['working_country']}\n"
+                         f"**Experience Level**: {job_post['experience_level']}\n"
+                         f"**Salary**: {job_post['salary']}\n"
+                         f"**Vacancy Number**: {job_post['vacancy_number']}\n"
+                         f"**Gender Preference**: {job_post['applicant_gender']}\n"
+                         f"**Closing Date**: {job_post['job_close_date']}\n")
+        bot.send_message(chat_id, job_post_text)
+    else:
+        bot.send_message(chat_id, "You have no job posts.")
+
 bot.polling()
