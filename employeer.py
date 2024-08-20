@@ -202,6 +202,9 @@ def handle_job_close_date(message):
     job_close_date = message.text.strip()
     job_info[chat_id]['job_close_date'] = job_close_date
     bot.send_message(chat_id, 'Job post received. The admin will review and respond it shortly.')
+
+    send_welcome(message)
+    
     employer_steps[chat_id] = None
 
     pending_job_posts[chat_id] = job_info[chat_id]
@@ -240,6 +243,7 @@ def approve_job(call):
     if job_details:
         post_to_channel(job_details)
         bot.send_message(chat_id, 'Your job post has been approved and posted to the channel.')
+        # send_welcome(message)
         bot.send_message(ADMIN_CHAT_ID, f"Job post for chat ID {chat_id} has been approved.")
     else:
         bot.send_message(call.message.chat.id, "No pending job found to approve.")
@@ -251,6 +255,7 @@ def reject_job(call):
 
     if job_details:
         bot.send_message(chat_id, 'Your job post has been rejected by the admin. Please review and try again with valid input.')
+        # send_welcome(message)
         bot.send_message(ADMIN_CHAT_ID, f"Job post for chat ID {chat_id} has been rejected.")
     else:
         bot.send_message(call.message.chat.id, "No pending job found to reject.")
