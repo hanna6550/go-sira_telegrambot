@@ -25,9 +25,10 @@ pending_job_posts = {}
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     welcome_message = ("Welcome, Employer! Please follow the instructions below to register and post jobs:\n\n"
-                       "/employee_profile_start - Begin the registration process with Employer profile.\n"
-                       "/postjob - Post a job.\n"
-                       "/myjob - View and manage your job post.\n")
+                       "/employee_profile_start - Begin the registration process with Employer profile.\n\n"
+                       "/postjob - Post a job.\n\n"
+                    #    "/myjob - View and manage your job post.\n"
+                       )
     bot.reply_to(message, welcome_message)
 
 def request_first_name(message):
@@ -126,17 +127,25 @@ def handle_job_description(message):
     job_description = message.text.strip()
     if len(job_description) >= 50:
         job_info[chat_id]['job_description'] = job_description
-        bot.send_message(chat_id, 'Please enter the job site:')
-        employer_steps[chat_id] = 'awaiting_job_site'
+        bot.send_message(chat_id, 'Please enter the job site (On-site, Remote, Hybrid):')
+        employer_steps[chat_id] = 'awaiting_education_qualification'
     else:
         bot.send_message(chat_id, 'Job description must be at least 50 characters long.')
+
+@bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_education_qualification')
+def handle_education_qualification(message):
+    chat_id = message.chat.id
+    education_qualification = message.text.strip()
+    job_info[chat_id]['education-qualification'] = education_qualification
+    bot.send_message(chat_id, 'Please enter the Education qualification (Diploma, Bachelor Degree, Masters Degree, Not Required, other):')
+    employer_steps[chat_id] = 'awaiting_job_site'
 
 @bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_job_site')
 def handle_job_site(message):
     chat_id = message.chat.id
     job_site = message.text.strip()
     job_info[chat_id]['job_site'] = job_site
-    bot.send_message(chat_id, 'Please enter the experience level:')
+    bot.send_message(chat_id, 'Please enter the experience level (Beginner, Intermediate, Senior, Expert):')
     employer_steps[chat_id] = 'awaiting_experience_level'
 
 @bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_experience_level')
@@ -144,7 +153,7 @@ def handle_experience_level(message):
     chat_id = message.chat.id
     experience_level = message.text.strip()
     job_info[chat_id]['experience_level'] = experience_level
-    bot.send_message(chat_id, 'Please enter the salary/compensation (you can skip by typing "skip"):')
+    bot.send_message(chat_id, 'Please enter the salary/compensation (Monthly, Fixed(One-time) Negotiable, ):')
     employer_steps[chat_id] = 'awaiting_salary'
 
 @bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_salary')
@@ -176,7 +185,7 @@ def handle_vacancy_number(message):
     chat_id = message.chat.id
     vacancy_number = message.text.strip()
     job_info[chat_id]['vacancy_number'] = vacancy_number
-    bot.send_message(chat_id, 'Please enter the preferred gender of the applicant:')
+    bot.send_message(chat_id, 'Please enter the preferred gender of the applicant (Female, Male, Both, Any):')
     employer_steps[chat_id] = 'awaiting_applicant_gender'
 
 @bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) == 'awaiting_applicant_gender')
@@ -192,7 +201,7 @@ def handle_job_close_date(message):
     chat_id = message.chat.id
     job_close_date = message.text.strip()
     job_info[chat_id]['job_close_date'] = job_close_date
-    bot.send_message(chat_id, 'Job post received. The admin will review it shortly.')
+    bot.send_message(chat_id, 'Job post received. The admin will review and respond it shortly.')
     employer_steps[chat_id] = None
 
     pending_job_posts[chat_id] = job_info[chat_id]
@@ -201,17 +210,18 @@ def handle_job_close_date(message):
 def notify_admin_for_approval(chat_id):
     job_details = pending_job_posts[chat_id]
     job_summary = (f"New job post submission:\n\n"
-                   f"Company Name: {job_details['company_name']}\n"
-                   f"Job Title: {job_details['job_title']}\n"
-                   f"Description: {job_details['job_description']}\n"
-                   f"Site: {job_details['job_site']}\n"
-                   f"Experience Level: {job_details['experience_level']}\n"
-                   f"Salary: {job_details['salary']}\n"
-                   f"Working Country: {job_details['working_country']}\n"
-                   f"Working City: {job_details['working_city']}\n"
-                   f"Vacancy Number: {job_details['vacancy_number']}\n"
-                   f"Applicant Gender: {job_details['applicant_gender']}\n"
-                   f"Close Date: {job_details['job_close_date']}\n\n"
+                   f"Company Name: {job_details['company_name']}\n\n"
+                   f"Job Title: {job_details['job_title']}\n\n"
+                   f"Description: {job_details['job_description']}\n\n"
+                   f"Site: {job_details['job_site']}\n\n"
+                   f"Education Qualifcaiton: {job_details['education-qualification']}\n\n"
+                   f"Experience Level: {job_details['experience_level']}\n\n"
+                   f"Salary: {job_details['salary']}\n\n"
+                   f"Working Country: {job_details['working_country']}\n\n"
+                   f"Working City: {job_details['working_city']}\n\n"
+                   f"Vacancy Number: {job_details['vacancy_number']}\n\n"
+                   f"Applicant Gender: {job_details['applicant_gender']}\n\n"
+                   f"Close Date: {job_details['job_close_date']}\n\n\n"
                    f"Chat ID: {chat_id}\n"
                    "Approve or Reject?")
     
@@ -240,21 +250,23 @@ def reject_job(call):
     job_details = pending_job_posts.pop(chat_id, None)
 
     if job_details:
-        bot.send_message(chat_id, 'Your job post has been rejected by the admin.')
+        bot.send_message(chat_id, 'Your job post has been rejected by the admin. Please review and try again with valid input.')
         bot.send_message(ADMIN_CHAT_ID, f"Job post for chat ID {chat_id} has been rejected.")
     else:
         bot.send_message(call.message.chat.id, "No pending job found to reject.")
 
 def post_to_channel(job_details):
-    channel_post = (f"🚨 New Job Posting 🚨\n\n"
-                    f"Company: {job_details['company_name']}\n"
-                    f"Job Title: {job_details['job_title']}\n"
-                    f"Job Description: {job_details['job_description']}\n"
-                    f"Location: {job_details['working_country']}, {job_details['working_city']}\n"
-                    f"Vacancy Number: {job_details['vacancy_number']}\n"
-                    f"Experience Level: {job_details['experience_level']}\n"
-                    f"Preferred Gender: {job_details['applicant_gender']}\n"
-                    f"Salary: {job_details['salary']}\n"
+    channel_post = (
+                    # f"🚨 New Job Posting 🚨\n\n"
+                    f"Job Title: {job_details['job_title']}\n\n"
+                    f"Company: {job_details['company_name']}\n\n"
+                    f"Education Qualifcaiton: {job_details['education-qualification']}\n\n"
+                    f"Experience Level: {job_details['experience_level']}\n\n"
+                    f"Preferred Gender: {job_details['applicant_gender']}\n\n"
+                    f"Location: {job_details['working_country']}, {job_details['working_city']}\n\n"
+                    f"Vacancy Number: {job_details['vacancy_number']}\n\n"
+                    f"Job Description: {job_details['job_description']}\n\n"
+                    f"Salary: {job_details['salary']}\n\n"
                     f"Application Deadline: {job_details['job_close_date']}\n\n"
                     # f"Apply on Bot: @bot1sirabot"
                     )
