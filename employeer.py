@@ -40,7 +40,7 @@ def employee_profile_start(message):
     request_first_name(message)
 
 @bot.message_handler(func=lambda message: employer_steps.get(message.chat.id) in [
-    'awaiting_first_name', 'awaiting_father_name', 'awaiting_dob'
+    'awaiting_first_name', 'awaiting_father_name', 'awaiting_phone_number', 'awaiting_dob'
 ])
 def handle_employer_info(message):
     chat_id = message.chat.id
@@ -57,18 +57,28 @@ def handle_employer_info(message):
     elif employer_steps.get(chat_id) == 'awaiting_father_name':
         father_name = message.text.strip()
         if father_name:
-            bot.send_message(chat_id, "Enter your date of birth or your age:")
+            bot.send_message(chat_id, "Enter your phone number:")
             employer_info[chat_id]['father_name'] = father_name
-            employer_steps[chat_id] = 'awaiting_dob'
+            employer_steps[chat_id] = 'awaiting_phone_number'
         else:
             bot.send_message(chat_id, "Please enter a valid father's name.")
+    
+    elif employer_steps.get(chat_id) == 'awaiting_phone_number':
+        phone_number = message.text.strip()
+        if (phone_number.startswith('+251 9') and len(phone_number) == 13) or (phone_number.startswith('0') and len(phone_number) == 10):
+            bot.send_message(chat_id, "Enter your date of birth or your age:")
+            employer_info[chat_id]['phone_number'] = phone_number
+            employer_steps[chat_id] = 'awaiting_dob'
+        else:
+            bot.send_message(chat_id, "Please enter a valid phone number. It should start with +251 9 or be a 10-digit number starting with 9.")
     
     elif employer_steps.get(chat_id) == 'awaiting_dob':
         dob = message.text.strip()
         if dob:
             bot.send_message(chat_id, f"Registration successful! Hello {employer_info[chat_id]['first_name']}, welcome to Go-Sira.\n"
                                       "/postjob - Post a job.\n"
-                                      "/myjob - View and manage your job post.\n")
+                                      # "/myjob - View and manage your job post.\n"
+                                      )
             employer_info[chat_id]['dob'] = dob
             employer_steps[chat_id] = None
             # Notify admin
@@ -76,9 +86,11 @@ def handle_employer_info(message):
                              f"New employer registration:\n\n"
                              f"First Name: {employer_info[chat_id]['first_name']}\n"
                              f"Father's Name: {employer_info[chat_id]['father_name']}\n"
+                             f"Phone Number: {employer_info[chat_id]['phone_number']}\n"
                              f"Date of Birth/Age: {employer_info[chat_id]['dob']}")
         else:
             bot.send_message(chat_id, "Please enter a valid date of birth or age.")
+
 
 @bot.message_handler(commands=['postjob'])
 def postjob(message):
@@ -273,7 +285,7 @@ def post_to_channel(job_details):
                     f"Job Description: {job_details['job_description']}\n\n"
                     f"Salary: {job_details['salary']}\n\n"
                     f"Application Deadline: {job_details['job_close_date']}\n\n"
-                    # f"Apply on Bot: @bot1sirabot"
+                    f"Apply on Bot: @bot1sirabot"
                     )
 
     markup = InlineKeyboardMarkup()

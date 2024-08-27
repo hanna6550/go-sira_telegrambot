@@ -80,7 +80,7 @@ def handle_full_name(message):
             user_steps[message.chat.id] = 'awaiting_coverletter'
             bot.reply_to(message, f"Thank you. Now, please upload your cover letter (PDF format) with the filename format '{users[message.chat.id]['full_name'].lower().replace(' ', '_')}_coverletter.pdf'.")
         else:
-            bot.reply_to(message, "Please enter a valid phone number (10-15 digits).")
+            bot.reply_to(message, "Please enter a valid phone number (10 digits).")
 
 @bot.message_handler(commands=['coverletter'])
 def request_coverletter(message):
