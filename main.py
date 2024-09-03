@@ -1,7 +1,7 @@
 import subprocess
 
 # Start the first script
-applicant = subprocess.Popen(["python", "app.py"])
+applicant = subprocess.Popen(["python", "applicant.py"])
 
 # Start the second script
 employer = subprocess.Popen(["python", "employeer.py"])
