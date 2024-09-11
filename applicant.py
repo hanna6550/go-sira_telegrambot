@@ -6,15 +6,15 @@ import re
 # Load environment variables from .env file
 load_dotenv()
 
-API_KEY = os.getenv('API_KEY')
+APPLICANT_API_KEY = os.getenv('APPLICANT_API_KEY')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
 
-if not API_KEY:
+if not APPLICANT_API_KEY:
     raise ValueError("No API key provided. Please set the API_KEY environment variable in the .env file.")
 if not ADMIN_CHAT_ID:
     raise ValueError("No Admin chat ID provided. Please set the ADMIN_CHAT_ID environment variable in the .env file.")
 
-bot = telebot.TeleBot(API_KEY)
+bot = telebot.TeleBot(APPLICANT_API_KEY)
 
 users = {}
 user_steps = {}
